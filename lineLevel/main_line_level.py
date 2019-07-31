@@ -85,7 +85,7 @@ class TextImageGenerator:
                  img_w, img_h, 
                  batch_size, 
                  downsample_factor,
-                 max_text_len=18):
+                 max_text_len=60):
         
         self.img_h = img_h
         self.img_w = img_w
