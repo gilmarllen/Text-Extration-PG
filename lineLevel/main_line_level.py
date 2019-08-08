@@ -64,7 +64,7 @@ letters = ['\0'] + sorted(string.printable[:95])
 print('Letters:', ' '.join(letters))
 
 def labels_to_text(labels):
-    return ''.join(list(map(lambda x: letters[int(x)], labels)))
+    return ''.join(list(map(lambda x: '' if (int(x)==0) else letters[int(x)], labels)))
 
 def text_to_labels(text, max_n):
     lst_base = [0] * max_n
@@ -103,7 +103,7 @@ class TextImageGenerator:
                 img_filepath = join(img_dirpath, filename)
                 desc_filepath = join(desc_dirpath, 'text_'+name.split('_')[1].split('CharDeg')[0]+'.txt')
                 descFile = open(desc_filepath, 'r')
-                description = descFile.read()
+                description = descFile.read().rstrip()
                 descFile.close()
                 if is_valid_str(description):
                     self.samples.append([img_filepath, description])
@@ -219,9 +219,9 @@ def train(img_w, load=False):
     downsample_factor = pool_size ** 2
     output_size = len(letters) + 1
     if not load:
-        tiger_train = TextImageGenerator('data_line_60_img_in/train', img_w, img_h, batch_size, downsample_factor)
+        tiger_train = TextImageGenerator('/mnt/swap-gpu/gilmarllen/data_line_60_img_in/train', img_w, img_h, batch_size, downsample_factor)
         tiger_train.build_data()
-        tiger_val = TextImageGenerator('data_line_60_img_in/val', img_w, img_h, batch_size, downsample_factor)
+        tiger_val = TextImageGenerator('/mnt/swap-gpu/gilmarllen/data_line_60_img_in/val', img_w, img_h, batch_size, downsample_factor)
         tiger_val.build_data()
         print(tiger_train.n)
         print(tiger_val.n)
@@ -268,7 +268,7 @@ def train(img_w, load=False):
     sgd = SGD(lr=0.02, decay=1e-6, momentum=0.9, nesterov=True, clipnorm=5)
 
     if load:
-        model = load_model('./model-2019-07-02_16-39-57-862593.h5', compile=False)
+        model = load_model('./model-2019-08-07_09-02-10-322339.h5', compile=False)
         print('Model loaded from file.')
     else:
         model = Model(inputs=[input_data, labels, input_length, label_length], outputs=loss_out)
@@ -318,52 +318,55 @@ def decode_batch(out):
 
 
 print('Calculating accuracy over test dataset...')
-tiger_test = TextImageGenerator('data_line_60_img_in/test', 837, 40, 8, 4)
+tiger_test = TextImageGenerator('/mnt/dados/gilmarllen/line_level/test_real/', 837, 40, 8, 4)
 tiger_test.build_data()
 
 net_inp = model.get_layer(name='the_input').input
 net_out = model.get_layer(name='softmax').output
 
-# for inp_value, _ in tiger_test.next_batch():
-#     bs = inp_value['the_input'].shape[0]
-#     X_data = inp_value['the_input']
-# #     print(X_data)
-#     net_out_value = sess.run(net_out, feed_dict={net_inp:X_data})
-#     print(net_out_value.shape)
-#     pred_texts = decode_batch(net_out_value)
-# #    print(pred_texts)
-#     labels = inp_value['the_labels']
-# #    print(labels)
-#     texts = []
-#     for label in labels:
-#         text = ''.join(list(map(lambda x: letters[int(x)], label)))
-#         texts.append(text)
-    
-#     for i in range(bs):
-# #        print(net_out_value[i].T)
-#         fig = plt.figure(figsize=(10, 10))
-#         outer = gridspec.GridSpec(2, 1, height_ratios=[1,9]) # wspace=10, hspace=0.1
-#         ax1 = plt.Subplot(fig, outer[0])
-#         fig.add_subplot(ax1)
-#         ax2 = plt.Subplot(fig, outer[1])
-#         fig.add_subplot(ax2)
-#         print('Predicted: %s\nTrue: %s' % (pred_texts[i], texts[i]))
-#         img = X_data[i][:, :, 0].T
-#         ax1.set_title('Input img')
-#         ax1.imshow(img, cmap='gray')
-#         ax1.set_xticks([])
-#         ax1.set_yticks([])
-#         ax2.set_title('Activations')
-#         ax2.imshow(net_out_value[i].T, cmap='binary', interpolation='nearest')
-#         ax2.set_yticks(list(range(len(letters) + 1)))
-#         ax2.set_yticklabels(letters + ['blank'])
-#         ax2.grid(False)
-#         for h in np.arange(-0.5, len(letters) + 1 + 0.5, 1):
-#             ax2.axhline(h, linestyle='-', color='k', alpha=0.5, linewidth=1)
+for inp_value, _ in tiger_test.next_batch():
+    bs = inp_value['the_input'].shape[0]
+    X_data = inp_value['the_input']
+#     print(X_data)
+    net_out_value = sess.run(net_out, feed_dict={net_inp:X_data})
+    print(net_out_value.shape)
+    pred_texts = decode_batch(net_out_value)
+#    print(pred_texts)
+    labels = inp_value['the_labels']
+#    print(labels)
+    texts = []
+    for label in labels:
+        text = labels_to_text(label)
+        texts.append(text)
+
+    for i in range(bs):
+#        print(net_out_value[i].T)
+        fig = plt.figure(figsize=(10, 10))
+        outer = gridspec.GridSpec(2, 1, height_ratios=[1,9]) # wspace=10, hspace=0.1
+        ax1 = plt.Subplot(fig, outer[0])
+        fig.add_subplot(ax1)
+        ax2 = plt.Subplot(fig, outer[1])
+        fig.add_subplot(ax2)
+        print('Pred: %s\nTrue: %s' % (pred_texts[i], texts[i]))
+        img = X_data[i][:, :, 0].T
+        ax1.set_title('Input img')
+        ax1.imshow(img, cmap='gray')
+        ax1.text(0, 70, 'Pred: '+pred_texts[i], fontsize=12)
+        ax1.text(0, 100, 'True: '+texts[i], fontsize=12)
+        ax1.set_xticks([])
+        ax1.set_yticks([])
+        ax2.set_title('Activations')
+        ax2.imshow(net_out_value[i].T, cmap='binary', interpolation='nearest')
+        ax2.set_yticks(list(range(len(letters) + 1)))
+        ax2.set_yticklabels(letters + ['blank'])
+        ax2.grid(False)
+        for h in np.arange(-0.5, len(letters) + 1 + 0.5, 1):
+            ax2.axhline(h, linestyle='-', color='k', alpha=0.5, linewidth=1)
         
-#         #ax.axvline(x, linestyle='--', color='k')
-#         plt.show()
-#     break
+        #ax.axvline(x, linestyle='--', color='k')
+        plt.savefig('img_'+str(i)+'.png')
+    break
+
 
 terr_med = 0.0
 batch_count = 0
