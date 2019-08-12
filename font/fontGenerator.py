@@ -3,6 +3,7 @@ import xml.etree.ElementTree as ET
 from xml.dom import minidom
 import string, cv2
 import numpy as np
+import os
 
 # Conversion RGB -> ARGB
 def rgb2argb_dec(hx):
@@ -66,36 +67,45 @@ def generateXML(chr, font, data_argb, size, baseLineValues):
   ETdata = ET.SubElement(imageData, 'data')
   ETdata.text = ','.join(data_argb)
 
-def generateFont(fontName, fontSize):
-	baseLineValues = baseLineGlobal.get(fontName, {})
-	fnt = ImageFont.truetype(fontName+'.ttf', fontSize)
+# Map the family name
+def getFamilyName(fontName):
+  familyDict = {'ari': 'arial', 'cour':'cour', 'times':'times'}
+  for key, val in familyDict.items():
+    if(fontName.lower().startswith(key)):
+      return val
+  return ''
 
-	# Just for use the textsize method
-	preImg = Image.new('RGB', (1, 1), color = (0, 0, 0))
-	p = ImageDraw.Draw(preImg)
+def generateFont(fontFile, fontSize):
+  fontName, ext = os.path.splitext(fontFile)
+  baseLineValues = baseLineGlobal.get(getFamilyName(fontName), {})
+  fnt = ImageFont.truetype(os.path.join('source/', fontFile), fontSize)
 
-	# create the file structure
-	font = ET.Element('font')
-	font.set('name',fontName+'-'+str(fontSize))
+  # Just for use the textsize method
+  preImg = Image.new('RGB', (1, 1), color = (0, 0, 0))
+  p = ImageDraw.Draw(preImg)
 
-	# Generate the bitmap for all printable characteres
-	idx = 0
-	for chr in string.printable[:95]:
-		(width, height) = p.textsize(chr,font=fnt)
-		# chr = 'G'
-		data_argb = [str(i) for i in get_argb(chr, fnt, (width, height))]
-		# print ( argb_data )
+  # create the file structure
+  font = ET.Element('font')
+  font.set('name',fontName+'-'+str(fontSize))
 
-		generateXML(chr, font, data_argb, (width, height), baseLineValues)
-		# img.save(fontName+'/'+str(idx)+'.png')
-		idx += 1
+  # Generate the bitmap for all printable characteres
+  idx = 0
+  for chr in string.printable[:95]:
+    (width, height) = p.textsize(chr,font=fnt)
+    # chr = 'G'
+    data_argb = [str(i) for i in get_argb(chr, fnt, (width, height))]
+    # print ( argb_data )
 
-	# create a new XML file with the results
-	mydata = prettify(font)
-	# print (mydata)
-	myfile = open(fontName+"-"+str(fontSize)+".of", "w")
-	myfile.write(mydata)
-	myfile.close()
+    generateXML(chr, font, data_argb, (width, height), baseLineValues)
+    # img.save(fontName+'/'+str(idx)+'.png')
+    idx += 1
+
+  # create a new XML file with the results
+  mydata = prettify(font)
+  # print (mydata)
+  myfile = open(os.path.join('build/', fontName+"-"+str(fontSize)+".of"), "w")
+  myfile.write(mydata)
+  myfile.close()
 
 # Map the baseLine for each font
 baseLineGlobal = {'arial': {'g': '82', 'j': '82', 'p': '82', 'q': '82', 'y': '82', '$': '95', '(': '90', ')': '90',
@@ -104,10 +114,12 @@ baseLineGlobal = {'arial': {'g': '82', 'j': '82', 'p': '82', 'q': '82', 'y': '82
  '[': '90', ']': '90', '{': '90', '}': '90', '|': '90', '@': '90', ',': '85', ';': '85'} }
 
 if __name__ == "__main__":
-	
-	# Select Font type and Font size to generate
-	for fontName in ['arial', 'cour', 'times']:
-		for fontSize in [14, 16, 18, 20]:
-			generateFont(fontName, fontSize)
 
-	print('Finish Gen Font')
+  # Select Font type and Font size to generate
+  for fontFile in os.listdir('source/'):
+    fontName, ext = os.path.splitext(fontFile)
+    if ext in ['.ttf', '.TTF']:
+      for fontSize in [14, 16, 18, 20]:
+        generateFont(fontFile, fontSize)
+
+  print('Finish Gen Font')
