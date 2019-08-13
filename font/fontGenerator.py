@@ -4,6 +4,7 @@ from xml.dom import minidom
 import string, cv2
 import numpy as np
 import os
+import math
 
 # Conversion RGB -> ARGB
 def rgb2argb_dec(hx):
@@ -15,12 +16,12 @@ def rgb2argb_dec(hx):
     a = '00'
   return int(a + r + g + b, 16)
 
-def get_argb(chr, fnt, size):
+def get_argb(chr, fnt, size, bgrColor):
   (width, height) = size
 
   img = Image.new('RGB', (width, height), color = (255, 255, 255))
   d = ImageDraw.Draw(img)
-  d.text((0,0), chr, font=fnt, fill=(0, 0, 0))
+  d.text((0,0), chr, font=fnt, fill=bgrColor)
 
   cv2_processed = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
   argb_data = []
@@ -75,7 +76,7 @@ def getFamilyName(fontName):
       return val
   return ''
 
-def generateFont(fontFile, fontSize):
+def generateFont(fontFile, fontSize, fontColor):
   fontName, ext = os.path.splitext(fontFile)
   baseLineValues = baseLineGlobal.get(getFamilyName(fontName), {})
   fnt = ImageFont.truetype(os.path.join('source/', fontFile), fontSize)
@@ -86,14 +87,18 @@ def generateFont(fontFile, fontSize):
 
   # create the file structure
   font = ET.Element('font')
-  font.set('name',fontName+'-'+str(fontSize))
+  font.set('name',fontName+'-'+str(fontSize)+'-'+fontColor)
 
   # Generate the bitmap for all printable characteres
   idx = 0
   for chr in string.printable[:95]:
     (width, height) = p.textsize(chr,font=fnt)
+    if (fontName=='timesi' or fontName=='timesbi') and chr=='f':
+      width = math.ceil(width*0.70)
+      baseLineValues['f'] = '80'
+
     # chr = 'G'
-    data_argb = [str(i) for i in get_argb(chr, fnt, (width, height))]
+    data_argb = [str(i) for i in get_argb(chr, fnt, (width, height), colorMap[fontColor])]
     # print ( argb_data )
 
     generateXML(chr, font, data_argb, (width, height), baseLineValues)
@@ -103,7 +108,7 @@ def generateFont(fontFile, fontSize):
   # create a new XML file with the results
   mydata = prettify(font)
   # print (mydata)
-  myfile = open(os.path.join('build/', fontName+"-"+str(fontSize)+".of"), "w")
+  myfile = open(os.path.join('build/', fontName+"-"+str(fontSize)+'-'+fontColor+".of"), "w")
   myfile.write(mydata)
   myfile.close()
 
@@ -113,6 +118,9 @@ baseLineGlobal = {'arial': {'g': '82', 'j': '82', 'p': '82', 'q': '82', 'y': '82
  '[': '90', ']': '90', '{': '90', '}': '90', '|': '90', '@': '90', ',': '85', ';': '85'}, 'times': {'g': '80', 'j': '80', 'p': '80', 'q': '80', 'y': '80', 'Q': '80', '$': '95', '(': '90', ')': '90',
  '[': '90', ']': '90', '{': '90', '}': '90', '|': '90', '@': '90', ',': '85', ';': '85'} }
 
+# Map the font colors
+colorMap = {'black': (0,0,0), 'dimgray': (105,105,105), 'darkgray': (169,169,169), 'lightgray': (211,211,211)}
+
 if __name__ == "__main__":
 
   # Select Font type and Font size to generate
@@ -120,6 +128,7 @@ if __name__ == "__main__":
     fontName, ext = os.path.splitext(fontFile)
     if ext in ['.ttf', '.TTF']:
       for fontSize in [14, 16, 18, 20]:
-        generateFont(fontFile, fontSize)
+      	for fontColor in ['black', 'dimgray', 'darkgray']:
+        	generateFont(fontFile, fontSize, fontColor)
 
   print('Finish Gen Font')
