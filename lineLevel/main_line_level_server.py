@@ -75,6 +75,8 @@ def text_to_labels(text, max_n):
     return lst_base
 
 def is_valid_str(s):
+    if len(s) == 0:
+        return False
     for ch in s:
         if not ch in letters:
             return False
@@ -221,9 +223,9 @@ def train(img_w, load=False):
     downsample_factor = pool_size ** 2
     output_size = len(letters) + 1
     if not load:
-        tiger_train = TextImageGenerator('/mnt/swap-gpu/gilmarllen/out_data_aug_effects/train', img_w, img_h, batch_size, downsample_factor)
+        tiger_train = TextImageGenerator('/mnt/swap-gpu/gilmarllen/data_aug_effects_v2/train', img_w, img_h, batch_size, downsample_factor)
         tiger_train.build_data()
-        tiger_val = TextImageGenerator('/mnt/swap-gpu/gilmarllen/out_data_aug_effects/val', img_w, img_h, batch_size, downsample_factor)
+        tiger_val = TextImageGenerator('/mnt/swap-gpu/gilmarllen/data_aug_effects_v2/val', img_w, img_h, batch_size, downsample_factor)
         tiger_val.build_data()
         print(tiger_train.n)
         print(tiger_val.n)
@@ -267,10 +269,10 @@ def train(img_w, load=False):
     loss_out = Lambda(ctc_lambda_func, output_shape=(1,), name='ctc')([y_pred, labels, input_length, label_length])
 
     # clipnorm seems to speeds up convergence
-    sgd = SGD(lr=0.02, decay=1e-6, momentum=0.9, nesterov=True, clipnorm=5)
+    sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True, clipnorm=5)
 
     if load:
-        model = load_model('./model-2019-08-27_07-36-13-363067.h5', compile=False)
+        model = load_model('./model-2019-09-13_18-13-25-054716.h5', compile=False)
         print('Model loaded from file.')
     else:
         model = Model(inputs=[input_data, labels, input_length, label_length], outputs=loss_out)
@@ -320,8 +322,8 @@ def decode_batch(out):
 
 
 print('Calculating accuracy over test dataset...')
-tiger_test = TextImageGenerator('/mnt/dados/gilmarllen/line_level/test_real', 837, 40, 8, 4)
-# /mnt/swap-gpu/gilmarllen/out_data_aug_effects/test
+tiger_test = TextImageGenerator('test_real/', 837, 40, 8, 4)
+# /mnt/swap-gpu/gilmarllen/data_aug_effects_v2/test
 tiger_test.build_data()
 
 net_inp = model.get_layer(name='the_input').input
@@ -367,5 +369,5 @@ for inp_value, _ in tiger_test.next_batch():
             ax2.axhline(h, linestyle='-', color='k', alpha=0.5, linewidth=1)
         
         #ax.axvline(x, linestyle='--', color='k')
-        #plt.savefig('img_'+str(i)+'.png')
+        plt.savefig('img_'+str(i)+'.png')
     break
