@@ -367,7 +367,7 @@ for inp_value, _ in tiger_test.next_batch():
         plt.savefig('img_'+str(i)+'.png')
     break
 
-
+char_qtd_total = 0
 terr_med = 0.0
 batch_count = 0
 for inp_value, _ in tiger_test.next_batch():
@@ -383,12 +383,13 @@ for inp_value, _ in tiger_test.next_batch():
         texts.append(text)
     
     for i in range(bs):
-        terr_med += Levenshtein.distance(pred_texts[i], texts[i])/max(len(pred_texts[i]),len(texts[i]))
+        terr_med += Levenshtein.distance(pred_texts[i], texts[i])
+        char_qtd_total += len(texts[i])
     
     # print(batch_count)
     batch_count += 1
     if batch_count>int(tiger_test.n/tiger_test.batch_size):
         break
 
-terr_med = terr_med/tiger_test.n
+terr_med = terr_med/char_qtd_total
 print('Acuraccy: %f'%(1-terr_med))
