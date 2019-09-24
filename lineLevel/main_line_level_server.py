@@ -64,14 +64,25 @@ MAX_OUT_LEN = 60
 LETTERS = ['\0'] + sorted(string.printable[:95])
 print('Letters:', ' '.join(LETTERS))
 
+LOAD_MODEL = None
 IMG_H = 837
 IMG_W = 40
-DATA_PATH = '/home/dl/gilmarllen/data/small_data/'
+DATA_PATH = '/mnt/d/small_test/'
     # train
     # val
     # test
 
+DIRS_TO_CREATE = ['imgs', 'logs', 'models']
 # <<
+
+def create_dir(directory):
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
+for dirName in DIRS_TO_CREATE:
+    create_dir(dirName)
+
+
 
 def labels_to_text(labels):
     return ''.join(list(map(lambda x: '' if (int(x)==0) else LETTERS[int(x)], labels)))
@@ -146,7 +157,7 @@ class TextImageGenerator:
         self.cur_index += 1
         if self.cur_index >= self.n:
             self.cur_index = 0
-        return build_data(self.indexes[self.cur_index])
+        return self.build_data(self.indexes[self.cur_index])
     
     def next_batch(self):
         while True:
@@ -305,7 +316,7 @@ def train(load=None):
         
     return model
 
-model = train(load=None)
+model = train(load=LOAD_MODEL)
 
 # For a real OCR application, this should be beam search with a dictionary
 # and language model.  For this example, best path is sufficient.
@@ -324,7 +335,7 @@ def decode_batch(out):
 
 
 print('Calculating accuracy over test dataset...')
-tiger_test = TextImageGenerator(join(DATA_PATH, 'test') 8, 4)
+tiger_test = TextImageGenerator(join(DATA_PATH, 'test'), 8, 4)
 
 net_inp = model.get_layer(name='the_input').input
 net_out = model.get_layer(name='softmax').output
