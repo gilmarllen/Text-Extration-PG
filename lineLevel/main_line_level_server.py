@@ -58,16 +58,27 @@ import string
 #     raise Exception()
 # # print(len(letters_train), len(letters_val), len(letters_val | letters_train))
 # letters = sorted(list(letters_train))
-max_out_len = 60
-letters = ['\0'] + sorted(string.printable[:95])
-print('Letters:', ' '.join(letters))
+
+# >> Parameters
+MAX_OUT_LEN = 60
+LETTERS = ['\0'] + sorted(string.printable[:95])
+print('Letters:', ' '.join(LETTERS))
+
+IMG_H = 837
+IMG_W = 40
+DATA_PATH = '/home/dl/gilmarllen/data/small_data/'
+    # train
+    # val
+    # test
+
+# <<
 
 def labels_to_text(labels):
-    return ''.join(list(map(lambda x: '' if (int(x)==0) else letters[int(x)], labels)))
+    return ''.join(list(map(lambda x: '' if (int(x)==0) else LETTERS[int(x)], labels)))
 
 def text_to_labels(text, max_n):
     lst_base = [0] * max_n
-    lst_enc = list(map(lambda x: letters.index(x), text))
+    lst_enc = list(map(lambda x: LETTERS.index(x), text))
     lst_base[:len(lst_enc)] = lst_enc
     return lst_base
 
@@ -75,7 +86,7 @@ def is_valid_str(s):
     if len(s) == 0:
         return False
     for ch in s:
-        if not ch in letters:
+        if not ch in LETTERS:
             return False
     return True
 
@@ -83,13 +94,12 @@ class TextImageGenerator:
     
     def __init__(self, 
                  dirpath,
-                 img_w, img_h, 
                  batch_size, 
                  downsample_factor,
-                 max_text_len=60):
+                 max_text_len=MAX_OUT_LEN):
         
-        self.img_h = img_h
-        self.img_w = img_w
+        self.img_h = IMG_H
+        self.img_w = IMG_W
         self.batch_size = batch_size
         self.max_text_len = max_text_len
         self.downsample_factor = downsample_factor
@@ -104,7 +114,7 @@ class TextImageGenerator:
                 img_filepath = join(img_dirpath, filename)
                 desc_filepath = join(desc_dirpath, 'text_'+name.split('_')[1]+'.txt')
                 descFile = open(desc_filepath, 'r')
-                description = descFile.read().strip()[:max_out_len]
+                description = descFile.read().strip()[:MAX_OUT_LEN]
                 descFile.close()
                 if is_valid_str(description):
                     self.samples.append([img_filepath, description])
@@ -128,7 +138,7 @@ class TextImageGenerator:
             self.texts.append(text)
         
     def get_output_size(self):
-        return len(letters) + 1
+        return len(LETTERS) + 1
     
     def next_sample(self):
         self.cur_index += 1
@@ -200,9 +210,7 @@ def ctc_lambda_func(args):
     return K.ctc_batch_cost(labels, y_pred, input_length, label_length)
 
 
-def train(img_w, load=False):
-    # Input Parameters
-    img_h = 40
+def train(load=None):
 
     # Network parameters
     conv_filters = 16
@@ -212,17 +220,17 @@ def train(img_w, load=False):
     rnn_size = 512
 
     if K.image_data_format() == 'channels_first':
-        input_shape = (1, img_w, img_h)
+        input_shape = (1, IMG_W, IMG_H)
     else:
-        input_shape = (img_w, img_h, 1)
+        input_shape = (IMG_W, IMG_H, 1)
         
     batch_size = 32
     downsample_factor = pool_size ** 2
-    output_size = len(letters) + 1
+    output_size = len(LETTERS) + 1
     if not load:
-        tiger_train = TextImageGenerator('/home/dl/gilmarllen/data/small_data/train', img_w, img_h, batch_size, downsample_factor)
+        tiger_train = TextImageGenerator(join(DATA_PATH, 'train'), batch_size, downsample_factor)
         tiger_train.build_data()
-        tiger_val = TextImageGenerator('/home/dl/gilmarllen/data/small_data/val', img_w, img_h, batch_size, downsample_factor)
+        tiger_val = TextImageGenerator(join(DATA_PATH, 'val'), batch_size, downsample_factor)
         tiger_val.build_data()
         print(tiger_train.n)
         print(tiger_val.n)
@@ -238,7 +246,7 @@ def train(img_w, load=False):
                    name='conv2')(inner)
     inner = MaxPooling2D(pool_size=(pool_size, pool_size), name='max2')(inner)
 
-    conv_to_rnn_dims = (img_w // (pool_size ** 2), (img_h // (pool_size ** 2)) * conv_filters)
+    conv_to_rnn_dims = (IMG_W // (pool_size ** 2), (IMG_H // (pool_size ** 2)) * conv_filters)
     inner = Reshape(target_shape=conv_to_rnn_dims, name='reshape')(inner)
 
     # cuts down input size going into RNN:
@@ -258,7 +266,7 @@ def train(img_w, load=False):
     y_pred = Activation('softmax', name='softmax')(inner)
     Model(inputs=input_data, outputs=y_pred).summary()
 
-    labels = Input(name='the_labels', shape=[max_out_len], dtype='float32')
+    labels = Input(name='the_labels', shape=[MAX_OUT_LEN], dtype='float32')
     input_length = Input(name='input_length', shape=[1], dtype='int64')
     label_length = Input(name='label_length', shape=[1], dtype='int64')
     # Keras doesn't currently support loss funcs with extra parameters
@@ -269,7 +277,7 @@ def train(img_w, load=False):
     sgd = SGD(lr=0.02, decay=1e-6, momentum=0.9, nesterov=True, clipnorm=5)
 
     if load:
-        model = load_model('./models/model-2019-09-22_04-55-07-958689.h5', compile=False)
+        model = load_model('./models/'+load, compile=False)
         print('Model loaded from file.')
     else:
         model = Model(inputs=[input_data, labels, input_length, label_length], outputs=loss_out)
@@ -298,9 +306,7 @@ def train(img_w, load=False):
         
     return model
 
-model = train(837, load=True)
-
-
+model = train(load=None)
 
 # For a real OCR application, this should be beam search with a dictionary
 # and language model.  For this example, best path is sufficient.
@@ -312,14 +318,14 @@ def decode_batch(out):
         out_best = [k for k, g in itertools.groupby(out_best)]
         outstr = ''
         for c in out_best:
-            if c < len(letters):
-                outstr += letters[c]
+            if c < len(LETTERS):
+                outstr += LETTERS[c]
         ret.append(outstr)
     return ret
 
 
 print('Calculating accuracy over test dataset...')
-tiger_test = TextImageGenerator('/home/dl/gilmarllen/data/small_data/test', 837, 40, 8, 4)
+tiger_test = TextImageGenerator(join(DATA_PATH, 'test') 8, 4)
 tiger_test.build_data()
 
 net_inp = model.get_layer(name='the_input').input
@@ -358,10 +364,10 @@ for inp_value, _ in tiger_test.next_batch():
         ax1.set_yticks([])
         ax2.set_title('Activations')
         ax2.imshow(net_out_value[i].T, cmap='binary', interpolation='nearest')
-        ax2.set_yticks(list(range(len(letters) + 1)))
-        ax2.set_yticklabels(letters + ['blank'])
+        ax2.set_yticks(list(range(len(LETTERS) + 1)))
+        ax2.set_yticklabels(LETTERS + ['blank'])
         ax2.grid(False)
-        for h in np.arange(-0.5, len(letters) + 1 + 0.5, 1):
+        for h in np.arange(-0.5, len(LETTERS) + 1 + 0.5, 1):
             ax2.axhline(h, linestyle='-', color='k', alpha=0.5, linewidth=1)
         
         #ax.axvline(x, linestyle='--', color='k')
@@ -381,7 +387,7 @@ for inp_value, _ in tiger_test.next_batch():
     labels = inp_value['the_labels']
     texts = []
     for label in labels:
-        text = ''.join(list(map(lambda x: letters[int(x)], label)))
+        text = ''.join(list(map(lambda x: LETTERS[int(x)], label)))
         texts.append(text)
     
     for i in range(bs):
