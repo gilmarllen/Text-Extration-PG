@@ -277,7 +277,7 @@ def train(load=None):
     sgd = SGD(lr=0.02, decay=1e-6, momentum=0.9, nesterov=True, clipnorm=5)
 
     if load:
-        model = load_model('./models/'+load, compile=False)
+        model = load_model(join('./models', load), compile=False)
         print('Model loaded from file.')
     else:
         model = Model(inputs=[input_data, labels, input_length, label_length], outputs=loss_out)
@@ -300,7 +300,7 @@ def train(load=None):
                             callbacks=[tensorboard])
         
         # save model and architecture to single file
-        modelName = "models/model-"+str(datetime.datetime.utcnow()).replace(' ', '_').replace(':','-').replace('.','-')+".h5"
+        modelName = join('./models', "model-"+str(datetime.datetime.utcnow()).replace(' ', '_').replace(':','-').replace('.','-')+".h5")
         model.save(modelName)
         print("Saved model to disk:%s\n"%modelName)
         
