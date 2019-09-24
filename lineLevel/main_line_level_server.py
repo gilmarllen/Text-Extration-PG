@@ -11,11 +11,8 @@ import itertools
 import re
 import datetime
 from time import time
-# import cairocffi as cairo
-# import editdistance
 import numpy as np
 from scipy import ndimage
-# import pylab
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -107,7 +104,7 @@ class TextImageGenerator:
                 img_filepath = join(img_dirpath, filename)
                 desc_filepath = join(desc_dirpath, 'text_'+name.split('_')[1]+'.txt')
                 descFile = open(desc_filepath, 'r')
-                description = descFile.read().strip()
+                description = descFile.read().strip()[:max_out_len]
                 descFile.close()
                 if is_valid_str(description):
                     self.samples.append([img_filepath, description])
@@ -223,9 +220,9 @@ def train(img_w, load=False):
     downsample_factor = pool_size ** 2
     output_size = len(letters) + 1
     if not load:
-        tiger_train = TextImageGenerator('/mnt/swap-gpu/gilmarllen/data_aug_effects_v2/train', img_w, img_h, batch_size, downsample_factor)
+        tiger_train = TextImageGenerator('/home/dl/gilmarllen/data/small_data/train', img_w, img_h, batch_size, downsample_factor)
         tiger_train.build_data()
-        tiger_val = TextImageGenerator('/mnt/swap-gpu/gilmarllen/data_aug_effects_v2/val', img_w, img_h, batch_size, downsample_factor)
+        tiger_val = TextImageGenerator('/home/dl/gilmarllen/data/small_data/val', img_w, img_h, batch_size, downsample_factor)
         tiger_val.build_data()
         print(tiger_train.n)
         print(tiger_val.n)
@@ -269,10 +266,10 @@ def train(img_w, load=False):
     loss_out = Lambda(ctc_lambda_func, output_shape=(1,), name='ctc')([y_pred, labels, input_length, label_length])
 
     # clipnorm seems to speeds up convergence
-    sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True, clipnorm=5)
+    sgd = SGD(lr=0.02, decay=1e-6, momentum=0.9, nesterov=True, clipnorm=5)
 
     if load:
-        model = load_model('./model-2019-09-13_18-13-25-054716.h5', compile=False)
+        model = load_model('./models/model-2019-09-22_04-55-07-958689.h5', compile=False)
         print('Model loaded from file.')
     else:
         model = Model(inputs=[input_data, labels, input_length, label_length], outputs=loss_out)
@@ -295,7 +292,7 @@ def train(img_w, load=False):
                             callbacks=[tensorboard])
         
         # save model and architecture to single file
-        modelName = "model-"+str(datetime.datetime.utcnow()).replace(' ', '_').replace(':','-').replace('.','-')+".h5"
+        modelName = "models/model-"+str(datetime.datetime.utcnow()).replace(' ', '_').replace(':','-').replace('.','-')+".h5"
         model.save(modelName)
         print("Saved model to disk:%s\n"%modelName)
         
@@ -322,8 +319,7 @@ def decode_batch(out):
 
 
 print('Calculating accuracy over test dataset...')
-tiger_test = TextImageGenerator('test_real/', 837, 40, 8, 4)
-# /mnt/swap-gpu/gilmarllen/data_aug_effects_v2/test
+tiger_test = TextImageGenerator('/home/dl/gilmarllen/data/small_data/test', 837, 40, 8, 4)
 tiger_test.build_data()
 
 net_inp = model.get_layer(name='the_input').input
@@ -369,5 +365,33 @@ for inp_value, _ in tiger_test.next_batch():
             ax2.axhline(h, linestyle='-', color='k', alpha=0.5, linewidth=1)
         
         #ax.axvline(x, linestyle='--', color='k')
-        plt.savefig('img_'+str(i)+'.png')
+        plt.savefig('imgs/img_'+str(i)+'.png')
     break
+
+
+char_qtd_total = 0
+terr_med = 0.0
+batch_count = 0
+for inp_value, _ in tiger_test.next_batch():
+    bs = inp_value['the_input'].shape[0]
+    X_data = inp_value['the_input']
+#     print(X_data)
+    net_out_value = sess.run(net_out, feed_dict={net_inp:X_data})
+    pred_texts = decode_batch(net_out_value)
+    labels = inp_value['the_labels']
+    texts = []
+    for label in labels:
+        text = ''.join(list(map(lambda x: letters[int(x)], label)))
+        texts.append(text)
+    
+    for i in range(bs):
+        terr_med += Levenshtein.distance(pred_texts[i], texts[i])
+        char_qtd_total += len(texts[i])
+    
+    # print(batch_count)
+    batch_count += 1
+    if batch_count>int(tiger_test.n/tiger_test.batch_size):
+        break
+
+terr_med = terr_med/char_qtd_total
+print('Acuraccy (char level): %f'%(1-terr_med))
