@@ -90,6 +90,12 @@ def is_valid_str(s):
             return False
     return True
 
+def getTextFromFile(filepath):
+    descFile = open(filepath, 'r')
+    description = descFile.read().strip()[:MAX_OUT_LEN]
+    descFile.close()
+    return description
+
 class TextImageGenerator:
     
     def __init__(self, 
@@ -113,29 +119,25 @@ class TextImageGenerator:
             if ext in ['.png', '.jpg']:
                 img_filepath = join(img_dirpath, filename)
                 desc_filepath = join(desc_dirpath, 'text_'+name.split('_')[1]+'.txt')
-                descFile = open(desc_filepath, 'r')
-                description = descFile.read().strip()[:MAX_OUT_LEN]
-                descFile.close()
-                if is_valid_str(description):
-                    self.samples.append([img_filepath, description])
+                if is_valid_str(getTextFromFile(desc_filepath)):
+                    self.samples.append([img_filepath, desc_filepath])
 
         self.n = len(self.samples)
         self.indexes = list(range(self.n))
         self.cur_index = 0
         
-    def build_data(self):
-        self.imgs = np.zeros((self.n, self.img_h, self.img_w))
-        self.texts = []
-        for i, (img_filepath, text) in enumerate(self.samples):
-            img = cv2.imread(img_filepath)
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            img = cv2.resize(img, (self.img_w, self.img_h))
-            img = img.astype(np.float32)
-            img /= 255
-            # width and height are backwards from typical Keras convention
-            # because width is the time dimension when it gets fed into the RNN
-            self.imgs[i, :, :] = img
-            self.texts.append(text)
+    def build_data(self, idx):
+        (img_filepath, text_filepath) = self.samples[idx]
+
+        img = cv2.imread(img_filepath)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        img = cv2.resize(img, (self.img_w, self.img_h))
+        img = img.astype(np.float32)
+        img /= 255
+        # width and height are backwards from typical Keras convention
+        # because width is the time dimension when it gets fed into the RNN
+
+        return img, getTextFromFile(text_filepath)
         
     def get_output_size(self):
         return len(LETTERS) + 1
@@ -144,8 +146,7 @@ class TextImageGenerator:
         self.cur_index += 1
         if self.cur_index >= self.n:
             self.cur_index = 0
-#            random.shuffle(self.indexes)
-        return self.imgs[self.indexes[self.cur_index]], self.texts[self.indexes[self.cur_index]]
+        return build_data(self.indexes[self.cur_index])
     
     def next_batch(self):
         while True:
@@ -229,9 +230,7 @@ def train(load=None):
     output_size = len(LETTERS) + 1
     if not load:
         tiger_train = TextImageGenerator(join(DATA_PATH, 'train'), batch_size, downsample_factor)
-        tiger_train.build_data()
         tiger_val = TextImageGenerator(join(DATA_PATH, 'val'), batch_size, downsample_factor)
-        tiger_val.build_data()
         print(tiger_train.n)
         print(tiger_val.n)
 
@@ -326,7 +325,6 @@ def decode_batch(out):
 
 print('Calculating accuracy over test dataset...')
 tiger_test = TextImageGenerator(join(DATA_PATH, 'test') 8, 4)
-tiger_test.build_data()
 
 net_inp = model.get_layer(name='the_input').input
 net_out = model.get_layer(name='softmax').output
