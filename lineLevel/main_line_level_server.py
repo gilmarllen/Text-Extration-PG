@@ -65,9 +65,9 @@ LETTERS = ['\0'] + sorted(string.printable[:95])
 print('Letters:', ' '.join(LETTERS))
 
 LOAD_MODEL = None
-IMG_H = 837
-IMG_W = 40
-DATA_PATH = '/mnt/d/small_test/'
+IMG_H = 40
+IMG_W = 837
+DATA_PATH = '/home/dl/gilmarllen/data/small_data/'
     # train
     # val
     # test
