@@ -64,13 +64,20 @@ MAX_OUT_LEN = 60
 LETTERS = ['\0'] + sorted(string.printable[:95])
 print('Letters:', ' '.join(LETTERS))
 
-LOAD_MODEL = None
+LOAD_MODEL = './models/model-2019-10-02_02-43-53-411679.h5'
 IMG_H = 40
 IMG_W = 837
-DATA_PATH = '/home/dl/gilmarllen/data/small_data/'
+
+# training
+DATA_PATH = '/home/dl/gilmarllen/data/dataset_ISRI_test/'
     # train
     # val
     # test
+
+# testing ocropy
+DATA_PATH_OCROPY = '/home/dl/gilmarllen/data/data_ocropy_drive/D2'
+IMG_NAME_OCROPY = 'rec-pos.nrm.png'
+INFO_NAME_OCROPY = 'rec-pos_lines-bboxes.json'
 
 DIRS_TO_CREATE = ['imgs', 'logs', 'models']
 # <<
@@ -107,31 +114,48 @@ def getTextFromFile(filepath):
     descFile.close()
     return description
 
+def getCropsFromFile(filepath):
+    with open(filepath) as json_file:
+        crops = json.load(json_file)
+        return crops
+
 class TextImageGenerator:
     
     def __init__(self, 
                  dirpath,
                  batch_size, 
                  downsample_factor,
-                 max_text_len=MAX_OUT_LEN):
+                 max_text_len=MAX_OUT_LEN,
+                 ocropy_data=False):
         
         self.img_h = IMG_H
         self.img_w = IMG_W
         self.batch_size = batch_size
         self.max_text_len = max_text_len
         self.downsample_factor = downsample_factor
-        
-        img_dirpath = join(dirpath, 'in')
-        desc_dirpath = join(dirpath, 'out')
+        self.ocropy_data = ocropy_data
+
         self.samples = []
-        
-        for filename in os.listdir(img_dirpath):
-            name, ext = os.path.splitext(filename)
-            if ext in ['.png', '.jpg']:
-                img_filepath = join(img_dirpath, filename)
-                desc_filepath = join(desc_dirpath, 'text_'+name.split('_')[1]+'.txt')
-                if is_valid_str(getTextFromFile(desc_filepath)):
-                    self.samples.append([img_filepath, desc_filepath])
+        if self.ocropy_data:
+            for sample in os.listdir(dirpath):
+                sample_dirpath = join(dirpath, sample)
+                json_ocropy_dirpath = join(sample_dirpath, INFO_NAME_OCROPY)
+                img_ocropy_dirpath = join(sample_dirpath, IMG_NAME_OCROPY)
+                if os.path.isfile(img_ocropy_dirpath) and os.path.isfile(json_ocropy_dirpath):
+                    crops = getCropsFromFile(json_ocropy_dirpath)
+                    if len(crops)>0:
+                        for sub_sample in [[sample_dirpath, sub_idx, None] for sub_idx in range(len(crops))]:
+                            self.samples.append(sub_sample)
+        else:
+            img_dirpath = join(dirpath, 'in')
+            desc_dirpath = join(dirpath, 'out')
+            for filename in os.listdir(img_dirpath):
+                name, ext = os.path.splitext(filename)
+                if ext in ['.png', '.jpg']:
+                    img_filepath = join(img_dirpath, filename)
+                    desc_filepath = join(desc_dirpath, 'text_'+'_'.join(name.split('_')[1:])+'.txt')
+                    if is_valid_str(getTextFromFile(desc_filepath)):
+                        self.samples.append([img_filepath, desc_filepath])
 
         self.n = len(self.samples)
         self.indexes = list(range(self.n))
@@ -149,6 +173,22 @@ class TextImageGenerator:
         # because width is the time dimension when it gets fed into the RNN
 
         return img, getTextFromFile(text_filepath)
+
+    def build_data_ocropy(self, idx):
+        (sample_dirpath, sub_idx, text_filepath) = self.samples[idx]
+
+        crop = getCropsFromFile(join(sample_dirpath, INFO_NAME_OCROPY))[sub_idx]
+
+        img = cv2.imread(join(sample_dirpath, IMG_NAME_OCROPY))
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        img = img[crop[2]:crop[3], crop[0]:crop[1]]
+        img = cv2.resize(img, (self.img_w, self.img_h))
+        img = img.astype(np.float32)
+        img /= 255
+        # width and height are backwards from typical Keras convention
+        # because width is the time dimension when it gets fed into the RNN
+
+        return img, ''
         
     def get_output_size(self):
         return len(LETTERS) + 1
@@ -157,7 +197,10 @@ class TextImageGenerator:
         self.cur_index += 1
         if self.cur_index >= self.n:
             self.cur_index = 0
-        return self.build_data(self.indexes[self.cur_index])
+        if self.ocropy_data:
+            return self.build_data_ocropy(self.indexes[self.cur_index])
+        else:
+            return self.build_data(self.indexes[self.cur_index])
     
     def next_batch(self):
         while True:
@@ -193,26 +236,6 @@ class TextImageGenerator:
             }
             outputs = {'ctc': np.zeros([self.batch_size])}
             yield (inputs, outputs)
-
-# tiger = TextImageGenerator('img_in/val', 315, 60, 8, 4)
-# tiger.build_data()
-
-# for inp, out in tiger.next_batch():
-#     print('Text generator output (data which will be fed into the neutral network):')
-#     print('1) the_input (image)')
-#     if K.image_data_format() == 'channels_first':
-#         img = inp['the_input'][0, 0, :, :]
-#     else:
-#         img = inp['the_input'][0, :, :, 0]
-    
-#     plt.imshow(img.T, cmap='gray')
-#     plt.show()
-#     print('2) the_labels (word): %s is encoded as %s' % 
-#           (labels_to_text(inp['the_labels'][0]), list(map(int, inp['the_labels'][0]))))
-#     print('3) input_length (width of image that is fed to the loss function): %d == %d / 4 - 2' % 
-#           (inp['input_length'][0], tiger.img_w))
-#     print('4) label_length (length of the word): %d' % inp['label_length'][0])
-#     break
 
 def ctc_lambda_func(args):
     y_pred, labels, input_length, label_length = args
@@ -284,10 +307,10 @@ def train(load=None):
     loss_out = Lambda(ctc_lambda_func, output_shape=(1,), name='ctc')([y_pred, labels, input_length, label_length])
 
     # clipnorm seems to speeds up convergence
-    sgd = SGD(lr=0.02, decay=1e-6, momentum=0.9, nesterov=True, clipnorm=5)
+    sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True, clipnorm=5)
 
     if load:
-        model = load_model(join('./models', load), compile=False)
+        model = load_model(load, compile=False)
         print('Model loaded from file.')
     else:
         model = Model(inputs=[input_data, labels, input_length, label_length], outputs=loss_out)
@@ -335,17 +358,18 @@ def decode_batch(out):
 
 
 print('Calculating accuracy over test dataset...')
-tiger_test = TextImageGenerator(join(DATA_PATH, 'test'), 8, 4)
+tiger_test = TextImageGenerator(DATA_PATH, 8, 4)
 
 net_inp = model.get_layer(name='the_input').input
 net_out = model.get_layer(name='softmax').output
 
+batch_count = 0
 for inp_value, _ in tiger_test.next_batch():
     bs = inp_value['the_input'].shape[0]
     X_data = inp_value['the_input']
 #     print(X_data)
     net_out_value = sess.run(net_out, feed_dict={net_inp:X_data})
-    print(net_out_value.shape)
+    #print(net_out_value.shape)
     pred_texts = decode_batch(net_out_value)
 #    print(pred_texts)
     labels = inp_value['the_labels']
@@ -380,8 +404,11 @@ for inp_value, _ in tiger_test.next_batch():
             ax2.axhline(h, linestyle='-', color='k', alpha=0.5, linewidth=1)
         
         #ax.axvline(x, linestyle='--', color='k')
-        plt.savefig('imgs/img_'+str(i)+'.png')
+        plt.savefig('imgs/img_'+str(batch_count)+'_'+str(i)+'.png')
+    batch_count += 1
     break
+    if batch_count>int(tiger_test.n/tiger_test.batch_size):
+        break
 
 
 char_qtd_total = 0
