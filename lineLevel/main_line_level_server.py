@@ -446,9 +446,10 @@ for inp_value, _ in tiger_test.next_batch():
         text = ''.join(list(map(lambda x: LETTERS[int(x)], label)))
         texts.append(text)
     
-    for i in range(bs) and sample_count<tiger_test.n:
-        terr_med += textdistance.levenshtein.normalized_distance(pred_texts[i], texts[i])
-        sample_count += 1    
+    for i in range(bs):
+        if sample_count<tiger_test.n:
+            terr_med += textdistance.levenshtein.normalized_distance(pred_texts[i], texts[i])
+            sample_count += 1
     
     if sample_count>=tiger_test.n:
         break
