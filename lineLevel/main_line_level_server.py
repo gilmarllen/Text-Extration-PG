@@ -3,6 +3,7 @@ import tensorflow as tf
 print('TensorFlow version:', tf.__version__)
 print('Keras version:', keras.__version__)
 
+import math
 import os
 from os.path import join
 import json
