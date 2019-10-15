@@ -427,7 +427,7 @@ for inp_value, _ in tiger_test.next_batch():
         break
 
 
-tiger_test = TextImageGenerator(DATA_PATH, 1, 4)
+tiger_test = TextImageGenerator(DATA_PATH, 8, 4)
 net_inp = model.get_layer(name='the_input').input
 net_out = model.get_layer(name='softmax').output
 
@@ -446,12 +446,10 @@ for inp_value, _ in tiger_test.next_batch():
         text = ''.join(list(map(lambda x: LETTERS[int(x)], label)))
         texts.append(text)
     
-    for i in range(bs):
+    for i in range(bs) and sample_count<tiger_test.n:
         terr_med += textdistance.levenshtein.normalized_distance(pred_texts[i], texts[i])
-        # terr_med += Levenshtein.distance(pred_texts[i], texts[i])
-        # char_qtd_total += len(texts[i])
+        sample_count += 1    
     
-    sample_count += 1
     if sample_count>=tiger_test.n:
         break
 
