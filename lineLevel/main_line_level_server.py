@@ -161,7 +161,7 @@ class TextImageGenerator:
         self.indexes = list(range(self.n))
         self.cur_index = 0
 
-    def resizeImgWithPadding(img):
+    def resizeImgWithPadding(self, img):
         src_h, src_w = img.shape
         scale_ratio = self.img_h/src_h
 
