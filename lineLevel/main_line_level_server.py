@@ -160,13 +160,28 @@ class TextImageGenerator:
         self.n = len(self.samples)
         self.indexes = list(range(self.n))
         self.cur_index = 0
+
+    def resizeImgWithPadding(img):
+        src_h, src_w = img.shape
+        scale_ratio = self.img_h/src_h
+
+        if math.ceil(scale_ratio*src_w) <= self.img_w:
+            img = cv2.resize(img, (math.ceil(scale_ratio*src_w), self.img_h))
+        else:
+            scale_ratio = self.img_w/src_w
+            img = cv2.resize(img, (self.img_w, math.ceil(scale_ratio*src_h)))
+
+        dst_h, dst_w = img.shape
+        end_image = np.ones((self.img_h, self.img_w), dtype=np.uint8) * 255
+        end_image[0:dst_h, 0:dst_w] = img
+        return end_image
         
     def build_data(self, idx):
         (img_filepath, text_filepath) = self.samples[idx]
 
         img = cv2.imread(img_filepath)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        img = cv2.resize(img, (self.img_w, self.img_h))
+        img = self.resizeImgWithPadding(img)
         img = img.astype(np.float32)
         img /= 255
         # width and height are backwards from typical Keras convention
@@ -182,7 +197,7 @@ class TextImageGenerator:
         img = cv2.imread(join(sample_dirpath, IMG_NAME_OCROPY))
         img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         img = img[crop[2]:crop[3], crop[0]:crop[1]]
-        img = cv2.resize(img, (self.img_w, self.img_h))
+        img = self.resizeImgWithPadding(img)
         img = img.astype(np.float32)
         img /= 255
         # width and height are backwards from typical Keras convention
