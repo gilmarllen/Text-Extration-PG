@@ -422,14 +422,17 @@ for inp_value, _ in tiger_test.next_batch():
         #ax.axvline(x, linestyle='--', color='k')
         plt.savefig('imgs/img_'+str(batch_count)+'_'+str(i)+'.png')
     batch_count += 1
-    break
-    if batch_count>int(tiger_test.n/tiger_test.batch_size):
+    if batch_count>=3:
         break
 
 
+tiger_test = TextImageGenerator(DATA_PATH, 1, 4)
+net_inp = model.get_layer(name='the_input').input
+net_out = model.get_layer(name='softmax').output
+
 char_qtd_total = 0
 terr_med = 0.0
-batch_count = 0
+sample_count = 0
 for inp_value, _ in tiger_test.next_batch():
     bs = inp_value['the_input'].shape[0]
     X_data = inp_value['the_input']
@@ -443,13 +446,13 @@ for inp_value, _ in tiger_test.next_batch():
         texts.append(text)
     
     for i in range(bs):
-        terr_med += Levenshtein.distance(pred_texts[i], texts[i])
-        char_qtd_total += len(texts[i])
+        terr_med += textdistance.levenshtein.normalized_distance(pred_texts[i], texts[i])
+        # terr_med += Levenshtein.distance(pred_texts[i], texts[i])
+        # char_qtd_total += len(texts[i])
     
-    # print(batch_count)
-    batch_count += 1
-    if batch_count>int(tiger_test.n/tiger_test.batch_size):
+    sample_count += 1
+    if sample_count>=tiger_test.n:
         break
 
-terr_med = terr_med/char_qtd_total
+terr_med = terr_med/sample_count
 print('Acuraccy (char level): %f'%(1-terr_med))
