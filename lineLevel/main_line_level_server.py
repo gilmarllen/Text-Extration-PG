@@ -165,17 +165,16 @@ class TextImageGenerator:
 
     def resizeImgWithPadding(self, img):
         src_h, src_w = img.shape
-        scale_ratio = self.img_h/src_h
 
-        if math.ceil(scale_ratio*src_w) <= self.img_w:
-            img = cv2.resize(img, (math.ceil(scale_ratio*src_w), self.img_h))
-        else:
-            scale_ratio = self.img_w/src_w
-            img = cv2.resize(img, (self.img_w, math.ceil(scale_ratio*src_h)))
+        text_h = math.ceil(self.img_h/2.0)
+        scale_ratio = text_h/src_h
+        text_w = min(self.img_w, math.ceil(scale_ratio*src_w))
+
+        img = cv2.resize(img, (text_w, text_h))
 
         dst_h, dst_w = img.shape
         end_image = np.ones((self.img_h, self.img_w), dtype=np.uint8) * 255
-        end_image[0:dst_h, 0:dst_w] = img
+        end_image[(self.img_h-dst_h)//2:((self.img_h-dst_h)//2)+dst_h, 0:dst_w] = img
         return end_image
         
     def build_data(self, idx):
