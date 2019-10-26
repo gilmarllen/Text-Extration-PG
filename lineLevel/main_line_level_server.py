@@ -31,7 +31,6 @@ from keras.utils.data_utils import get_file
 from keras.preprocessing import image
 from keras.callbacks import TensorBoard
 import cv2
-import Levenshtein
 
 sess = tf.Session()
 K.set_session(sess)
@@ -62,22 +61,23 @@ import string
 # letters = sorted(list(letters_train))
 
 # >> Parameters
-MAX_OUT_LEN = 60
+MAX_OUT_LEN = 120
 LETTERS = ['\0'] + sorted(string.printable[:95])
 print('Letters:', ' '.join(LETTERS))
 
-LOAD_MODEL = './models/model-2019-10-02_02-43-53-411679.h5'
+LOAD_MODEL = './models/model-2019-10-02_02-43-53-411679.h5' #None
 IMG_H = 40
-IMG_W = 837
+IMG_W = 837 #1680
 
 # training
-DATA_PATH = '/home/dl/gilmarllen/data/dataset_ISRI_test/'
+DATA_PATH = '/home/dl/gilmarllen/data/data_line_30_120_step_2/'
     # train
     # val
     # test
+TEST_PATH = '/home/dl/gilmarllen/data/dataset_ISRI_test_manual/'
 
 # testing ocropy
-DATA_PATH_OCROPY = '/home/dl/gilmarllen/data/data_ocropy_drive/D2'
+# DATA_PATH_OCROPY = '/home/dl/gilmarllen/data/'
 IMG_NAME_OCROPY = 'rec-pos.nrm.png'
 INFO_NAME_OCROPY = 'rec-pos_lines-bboxes.json'
 
@@ -127,6 +127,7 @@ class TextImageGenerator:
                  dirpath,
                  batch_size, 
                  downsample_factor,
+                 normalize_size=False,
                  max_text_len=MAX_OUT_LEN,
                  ocropy_data=False):
         
@@ -136,6 +137,7 @@ class TextImageGenerator:
         self.max_text_len = max_text_len
         self.downsample_factor = downsample_factor
         self.ocropy_data = ocropy_data
+        self.normalize_size = normalize_size
 
         self.samples = []
         if self.ocropy_data:
@@ -182,7 +184,8 @@ class TextImageGenerator:
 
         img = cv2.imread(img_filepath)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        img = self.resizeImgWithPadding(img)
+        if self.normalize_size:
+            img = self.resizeImgWithPadding(img)
         img = img.astype(np.float32)
         img /= 255
         # width and height are backwards from typical Keras convention
@@ -198,7 +201,8 @@ class TextImageGenerator:
         img = cv2.imread(join(sample_dirpath, IMG_NAME_OCROPY))
         img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         img = img[crop[2]:crop[3], crop[0]:crop[1]]
-        img = self.resizeImgWithPadding(img)
+        if self.normalize_size:
+            img = self.resizeImgWithPadding(img)
         img = img.astype(np.float32)
         img /= 255
         # width and height are backwards from typical Keras convention
@@ -369,16 +373,17 @@ def decode_batch(out):
         for c in out_best:
             if c < len(LETTERS):
                 outstr += LETTERS[c]
-        ret.append(outstr)
+        ret.append(outstr.strip())
     return ret
 
 
 print('Calculating accuracy over test dataset...')
-tiger_test = TextImageGenerator(DATA_PATH, 8, 4)
+tiger_test = TextImageGenerator(TEST_PATH, 8, 4, True)
 
 net_inp = model.get_layer(name='the_input').input
 net_out = model.get_layer(name='softmax').output
 
+sample_count = 0
 batch_count = 0
 for inp_value, _ in tiger_test.next_batch():
     bs = inp_value['the_input'].shape[0]
@@ -393,40 +398,44 @@ for inp_value, _ in tiger_test.next_batch():
     texts = []
     for label in labels:
         text = labels_to_text(label)
-        texts.append(text)
+        texts.append(text.strip())
 
     for i in range(bs):
-#        print(net_out_value[i].T)
-        fig = plt.figure(figsize=(10, 10))
-        outer = gridspec.GridSpec(2, 1, height_ratios=[1,9]) # wspace=10, hspace=0.1
-        ax1 = plt.Subplot(fig, outer[0])
-        fig.add_subplot(ax1)
-        ax2 = plt.Subplot(fig, outer[1])
-        fig.add_subplot(ax2)
-        print('Pred: %s\nTrue: %s' % (pred_texts[i], texts[i]))
-        img = X_data[i][:, :, 0].T
-        ax1.set_title('Input img')
-        ax1.imshow(img, cmap='gray')
-        ax1.text(0, 70, 'Pred: '+pred_texts[i], fontsize=12)
-        ax1.text(0, 100, 'True: '+texts[i], fontsize=12)
-        ax1.set_xticks([])
-        ax1.set_yticks([])
-        ax2.set_title('Activations')
-        ax2.imshow(net_out_value[i].T, cmap='binary', interpolation='nearest')
-        ax2.set_yticks(list(range(len(LETTERS) + 1)))
-        ax2.set_yticklabels(LETTERS + ['blank'])
-        ax2.grid(False)
-        for h in np.arange(-0.5, len(LETTERS) + 1 + 0.5, 1):
-            ax2.axhline(h, linestyle='-', color='k', alpha=0.5, linewidth=1)
+        if sample_count<tiger_test.n:
+            sample_count += 1
+    #        print(net_out_value[i].T)
+            fig = plt.figure(figsize=(10, 10))
+            outer = gridspec.GridSpec(2, 1, height_ratios=[1,9]) # wspace=10, hspace=0.1
+            ax1 = plt.Subplot(fig, outer[0])
+            fig.add_subplot(ax1)
+            ax2 = plt.Subplot(fig, outer[1])
+            fig.add_subplot(ax2)
+            print('Pred: %s\nTrue: %s' % (pred_texts[i], texts[i]))
+            img = X_data[i][:, :, 0].T
+            ax1.set_title('Input img')
+            ax1.imshow(img, cmap='gray')
+            ax1.text(-100, 70, 'Pred: '+pred_texts[i], fontsize=12)
+            ax1.text(-100, 100, 'True: '+texts[i], fontsize=12)
+            ax1.set_xticks([])
+            ax1.set_yticks([])
+            ax2.set_title('Activations')
+            ax2.imshow(net_out_value[i].T, cmap='binary', interpolation='nearest')
+            ax2.set_yticks(list(range(len(LETTERS) + 1)))
+            ax2.set_yticklabels(LETTERS + ['blank'])
+            ax2.grid(False)
+            for h in np.arange(-0.5, len(LETTERS) + 1 + 0.5, 1):
+                ax2.axhline(h, linestyle='-', color='k', alpha=0.5, linewidth=1)
         
-        #ax.axvline(x, linestyle='--', color='k')
-        plt.savefig('imgs/img_'+str(batch_count)+'_'+str(i)+'.png')
-    batch_count += 1
-    if batch_count>=3:
+            #ax.axvline(x, linestyle='--', color='k')
+            plt.savefig('imgs/img_'+str(batch_count)+'_'+str(i)+'.png')
+    if sample_count>=tiger_test.n:
         break
+    batch_count += 1
+#        if batch_count>=3:
+#            break
 
 
-tiger_test = TextImageGenerator(DATA_PATH, 8, 4)
+tiger_test = TextImageGenerator(TEST_PATH, 8, 4, True)
 net_inp = model.get_layer(name='the_input').input
 net_out = model.get_layer(name='softmax').output
 
@@ -443,7 +452,7 @@ for inp_value, _ in tiger_test.next_batch():
     texts = []
     for label in labels:
         text = ''.join(list(map(lambda x: LETTERS[int(x)], label)))
-        texts.append(text)
+        texts.append(text.strip())
     
     for i in range(bs):
         if sample_count<tiger_test.n:
