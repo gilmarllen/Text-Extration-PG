@@ -3,16 +3,17 @@ import os
 import random
 import json
 import string
+import numpy as np
 
 TOTAL_SAMPLES = 100000
 TRAIN_RATE = 0.70
 VAL_RATE = 0.10
 TEST_RATE = 0.20
 MAX_SIZE_WORD = 18
-MAX_SIZE_LINE = 60
+MAX_SIZE_LINE_RANGE = (30, 120)
 MIN_SIZE_LINE = 5
 MIN_FREQ_CHAR = 300
-MAIN_FOLDER = 'data_line_60'
+MAIN_FOLDER = '/mnt/d/PG/data_line_30_120_step_0/'
 
 linesList = list()
 freq_len_line = dict()
@@ -48,6 +49,7 @@ def chunkstring(string, length):
     return (string[0+i:length+i] for i in range(0, len(string), length))
 
 def nextLineProcess(art):
+	MAX_SIZE_LINE = np.random.random_integers(MAX_SIZE_LINE_RANGE[0], MAX_SIZE_LINE_RANGE[1])
 	if len(art)<=MAX_SIZE_LINE:
 		return (art,'')
 
@@ -129,7 +131,7 @@ random.shuffle(linesList)
 print('Saving files...')
 for i,w in enumerate(linesList):
 	if i<(TOTAL_SAMPLES*TRAIN_RATE):
-		save_toFile(i,w,'train')
+		save_toFile(i,w,'train/')
 	elif i<(TOTAL_SAMPLES*(TRAIN_RATE+VAL_RATE)):
 		save_toFile(i,w,'val/')
 	elif i<(TOTAL_SAMPLES*(TRAIN_RATE+VAL_RATE+TEST_RATE)):

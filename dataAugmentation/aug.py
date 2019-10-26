@@ -1,6 +1,6 @@
 import numpy as np
 import cv2
-import skimage
+from skimage import io, util, transform, draw
 import xml.etree.ElementTree as ET
 import xmltodict, json
 import math
@@ -82,7 +82,7 @@ def getRandom(rMin, rMax):
 
 def shift(image, vector):
 	vector = (-vector[0], -vector[1])
-	shifted = skimage.transform.warp(image, skimage.transform.AffineTransform(translation=vector), mode='wrap', preserve_range=True)
+	shifted = transform.warp(image, transform.AffineTransform(translation=vector), mode='wrap', preserve_range=True)
 	return shifted.astype(image.dtype)
 
 def crop_image(img):
@@ -112,13 +112,13 @@ def getParams(tree):
 	return (textBox1, w, h)
 
 def drawRect():
-	rr, cc = skimage.draw.line(textBox1[0], textBox1[1], textBox2[0], textBox2[1])
+	rr, cc = draw.line(textBox1[0], textBox1[1], textBox2[0], textBox2[1])
 	img[cc, rr] = np.array([255, 0, 0, 255])
-	rr, cc = skimage.draw.line(textBox2[0], textBox2[1], textBox3[0], textBox3[1])
+	rr, cc = draw.line(textBox2[0], textBox2[1], textBox3[0], textBox3[1])
 	img[cc, rr] = np.array([255, 0, 0, 255])
-	rr, cc = skimage.draw.line(textBox3[0], textBox3[1], textBox4[0], textBox4[1])
+	rr, cc = draw.line(textBox3[0], textBox3[1], textBox4[0], textBox4[1])
 	img[cc, rr] = np.array([255, 0, 0, 255])
-	rr, cc = skimage.draw.line(textBox4[0], textBox4[1], textBox1[0], textBox1[1])
+	rr, cc = draw.line(textBox4[0], textBox4[1], textBox1[0], textBox1[1])
 	img[cc, rr] = np.array([255, 0, 0, 255])
 
 def getRandomImage():
@@ -138,74 +138,77 @@ def getRandomImage():
 
 
 # __MAIN
+DATASETS = ['val', 'test', 'train']
+for d in DATASETS:
 
-MAIN_PATH = '/home/gilmarllen/PG/data_aug/out_DC_effects/'
-CLEAN_PATH = os.path.join(MAIN_PATH, 'clean/')
-EFFECTS_PATH = os.path.join(MAIN_PATH, 'effects/')
-OUT_PATH = '/home/gilmarllen/PG/data_aug/data2run/'
+	MAIN_PATH = os.path.join('/mnt/d/PG/data_line_30_120_step_1/', d)
+	CLEAN_PATH = os.path.join(MAIN_PATH, 'clean/')
+	EFFECTS_PATH = os.path.join(MAIN_PATH, 'effects/')
+	OUT_PATH = os.path.join('/mnt/d/PG/data_line_30_120_step_2/', d)
 
-for filename in os.listdir(CLEAN_PATH):
-	name, ext = os.path.splitext(filename)
-	if ext in ['.png']:
-		try:
-			img_id = name.split('_')[1]
-			img_name = getRandomImage()
+	for filename in os.listdir(CLEAN_PATH):
+		name, ext = os.path.splitext(filename)
+		if ext in ['.png']:
+			try:
+				img_id = name.split('_')[1]
+				img_name = getRandomImage()
 
-			# read image
-			img = skimage.io.imread(img_name)
+				# read image
+				img = cv2.imread(img_name)
+				img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-			# get parameters
-			imgHeight = img.shape[0]
-			imgWidth = img.shape[1]
+				# get parameters
+				imgHeight = img.shape[0]
+				imgWidth = img.shape[1]
 
-			tree = ET.parse(os.path.join(CLEAN_PATH, 'truth_'+img_id+'.od')) # '/home/gilmarllen/ubuntu16/out/truth_6417.od'
-			textBox1, textBoxWidth, textBoxHeight = getParams(tree)
+				tree = ET.parse(os.path.join(CLEAN_PATH, 'truth_'+img_id+'.od')) # '/home/gilmarllen/ubuntu16/out/truth_6417.od'
+				textBox1, textBoxWidth, textBoxHeight = getParams(tree)
 
-			# TRANSLATION
-			shiftX = getRandom(-textBox1[0],imgWidth-1-(textBox1[0]+textBoxWidth))
-			shiftY = getRandom(-textBox1[1],imgHeight-1-(textBox1[1]+textBoxHeight))
-			img = shift(img, (shiftX, shiftY))
-			# update text corners
-			textBox1 = (textBox1[0]+shiftX, textBox1[1]+shiftY)
-			textBox2 = (textBox1[0]+textBoxWidth, textBox1[1])
-			textBox3 = (textBox1[0]+textBoxWidth, textBox1[1]+textBoxHeight)
-			textBox4 = (textBox1[0], textBox1[1]+textBoxHeight)
+				# TRANSLATION
+				shiftX = getRandom(-textBox1[0],imgWidth-1-(textBox1[0]+textBoxWidth))
+				shiftY = getRandom(-textBox1[1],imgHeight-1-(textBox1[1]+textBoxHeight))
+				img = shift(img, (shiftX, shiftY))
+				# update text corners
+				textBox1 = (textBox1[0]+shiftX, textBox1[1]+shiftY)
+				textBox2 = (textBox1[0]+textBoxWidth, textBox1[1])
+				textBox3 = (textBox1[0]+textBoxWidth, textBox1[1]+textBoxHeight)
+				textBox4 = (textBox1[0], textBox1[1]+textBoxHeight)
 
-			# ROTATION
-			center = (getRandom(textBox1[0]+EPS, textBox1[0]+textBoxWidth-EPS),int(textBoxHeight/2))
-			# center = (textBox1[0]+15,textBox1[1]+int(textBoxHeight/2))
-			alfa = getAngle()
-			# print('Angle: %f'%alfa)
-			img = skimage.transform.rotate(img, angle=alfa, mode='wrap', center=center)
-			img = skimage.util.img_as_ubyte(img)
-			# update text corners
-			textBox1 = updateCornerRotate(textBox1)
-			textBox2 = updateCornerRotate(textBox2)
-			textBox3 = updateCornerRotate(textBox3)
-			textBox4 = updateCornerRotate(textBox4)
-			# drawRect()
+				# ROTATION
+				center = (getRandom(textBox1[0]+EPS, textBox1[0]+textBoxWidth-EPS),int(textBoxHeight/2))
+				# center = (textBox1[0]+15,textBox1[1]+int(textBoxHeight/2))
+				alfa = getAngle()
+				# print('Angle: %f'%alfa)
+				img = transform.rotate(img, angle=alfa, mode='wrap', center=center)
+				img = util.img_as_ubyte(img)
+				# update text corners
+				textBox1 = updateCornerRotate(textBox1)
+				textBox2 = updateCornerRotate(textBox2)
+				textBox3 = updateCornerRotate(textBox3)
+				textBox4 = updateCornerRotate(textBox4)
+				# drawRect()
 
-			# SCALE
-			# img = skimage.transform.rescale(img, 1.0/4.0)
-			# img = skimage.util.img_as_ubyte(img)
-			# print(img[0][0][0])
-			img = skimage.util.img_as_ubyte( skimage.transform.resize(crop_image(img), (imgHeight, imgWidth)) )
+				# SCALE
+				# img = transform.rescale(img, 1.0/4.0)
+				# img = util.img_as_ubyte(img)
+				# print(img[0][0][0])
+				img = util.img_as_ubyte( transform.resize(crop_image(img), (imgHeight, imgWidth)) )
 
-			# DOWN RESOLUTION
-			img = skimage.util.img_as_ubyte( skimage.transform.resize(skimage.transform.rescale(img, random.uniform(0.65, 1.0) ), (imgHeight, imgWidth)) )
+				# DOWN RESOLUTION
+				img = util.img_as_ubyte( transform.resize(transform.rescale(img, random.uniform(0.65, 1.0) ), (imgHeight, imgWidth)) )
 
-			# # save image file
-			# skimage.io.imshow(img)
-			# skimage.io.show()
-			skimage.io.imsave(os.path.join(OUT_PATH, 'in/'+filename), img)
-			
-			# save description text file
-			descFile = open(os.path.join(CLEAN_PATH, 'text_'+img_id+'.txt'), 'r')
-			description = descFile.read()
-			descFile.close()
-			newFile = open(os.path.join(OUT_PATH, 'out/text_'+img_id+'.txt'), 'w')
-			newFile.write(description)
-			newFile.close()
+				# # save image file
+				# io.imshow(img)
+				# io.show()
+				io.imsave(os.path.join(OUT_PATH, 'in/'+filename), img)
+				
+				# save description text file
+				descFile = open(os.path.join(CLEAN_PATH, 'text_'+img_id+'.txt'), 'r')
+				description = descFile.read()
+				descFile.close()
+				newFile = open(os.path.join(OUT_PATH, 'out/text_'+img_id+'.txt'), 'w')
+				newFile.write(description)
+				newFile.close()
 
-		except Exception as e:
-			print ("ERROR processing %s: "%img_name,e.args[0])
+			except Exception as e:
+				print ("ERROR processing %s: "%img_name,e.args[0])
