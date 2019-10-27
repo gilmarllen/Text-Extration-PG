@@ -65,9 +65,9 @@ MAX_OUT_LEN = 120
 LETTERS = ['\0'] + sorted(string.printable[:95])
 print('Letters:', ' '.join(LETTERS))
 
-LOAD_MODEL = './models/model-2019-10-02_02-43-53-411679.h5' #None
+LOAD_MODEL = './models/model-2019-10-24_05-41-20-260260.h5' #None
 IMG_H = 40
-IMG_W = 837 #1680
+IMG_W = 1680 #837
 
 # training
 DATA_PATH = '/home/dl/gilmarllen/data/data_line_30_120_step_2/'
@@ -385,7 +385,7 @@ net_out = model.get_layer(name='softmax').output
 
 sample_count = 0
 batch_count = 0
-for inp_value, _ in tiger_test.next_batch():
+for inp_value, _ in []: #tiger_test.next_batch():
     bs = inp_value['the_input'].shape[0]
     X_data = inp_value['the_input']
 #     print(X_data)
@@ -416,6 +416,7 @@ for inp_value, _ in tiger_test.next_batch():
             ax1.imshow(img, cmap='gray')
             ax1.text(-100, 70, 'Pred: '+pred_texts[i], fontsize=12)
             ax1.text(-100, 100, 'True: '+texts[i], fontsize=12)
+            ax1.text(-100, 140, 'Acc.: '+str(textdistance.levenshtein.normalized_distance(pred_texts[i], texts[i])), fontsize=12)
             ax1.set_xticks([])
             ax1.set_yticks([])
             ax2.set_title('Activations')
