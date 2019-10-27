@@ -65,9 +65,9 @@ MAX_OUT_LEN = 120
 LETTERS = ['\0'] + sorted(string.printable[:95])
 print('Letters:', ' '.join(LETTERS))
 
-LOAD_MODEL = './models/model-2019-10-02_02-43-53-411679.h5' #None
+LOAD_MODEL = './models/model-2019-10-24_05-41-20-260260.h5' #None
 IMG_H = 40
-IMG_W = 837 #1680
+IMG_W = 1680 #837
 
 # training
 DATA_PATH = '/home/dl/gilmarllen/data/data_line_30_120_step_2/'
@@ -120,6 +120,9 @@ def getCropsFromFile(filepath):
     with open(filepath) as json_file:
         crops = json.load(json_file)
         return crops
+
+def calc_metric(x, y):
+    return 1.00 - textdistance.levenshtein.normalized_distance(x, y)
 
 class TextImageGenerator:
     
@@ -378,6 +381,9 @@ def decode_batch(out):
 
 
 print('Calculating accuracy over test dataset...')
+f_pred = open("predicted.txt", "w")
+f_corr = open("correct.txt", "w")
+
 tiger_test = TextImageGenerator(TEST_PATH, 8, 4, True)
 
 net_inp = model.get_layer(name='the_input').input
@@ -411,11 +417,14 @@ for inp_value, _ in tiger_test.next_batch():
             ax2 = plt.Subplot(fig, outer[1])
             fig.add_subplot(ax2)
             print('Pred: %s\nTrue: %s' % (pred_texts[i], texts[i]))
+            f_pred.write(pred_texts[i]+"\n")
+            f_corr.write(texts[i]+"\n")
             img = X_data[i][:, :, 0].T
             ax1.set_title('Input img')
             ax1.imshow(img, cmap='gray')
             ax1.text(-100, 70, 'Pred: '+pred_texts[i], fontsize=12)
             ax1.text(-100, 100, 'True: '+texts[i], fontsize=12)
+            ax1.text(-100, 140, 'Acc.: '+str(calc_metric(texts[i], pred_texts[i])), fontsize=12)
             ax1.set_xticks([])
             ax1.set_yticks([])
             ax2.set_title('Activations')
@@ -434,13 +443,16 @@ for inp_value, _ in tiger_test.next_batch():
 #        if batch_count>=3:
 #            break
 
+f_pred.close()
+f_corr.close()
+
 
 tiger_test = TextImageGenerator(TEST_PATH, 8, 4, True)
 net_inp = model.get_layer(name='the_input').input
 net_out = model.get_layer(name='softmax').output
 
 char_qtd_total = 0
-terr_med = 0.0
+acc_med = 0.0
 sample_count = 0
 for inp_value, _ in tiger_test.next_batch():
     bs = inp_value['the_input'].shape[0]
@@ -456,11 +468,11 @@ for inp_value, _ in tiger_test.next_batch():
     
     for i in range(bs):
         if sample_count<tiger_test.n:
-            terr_med += textdistance.levenshtein.normalized_distance(pred_texts[i], texts[i])
+            acc_med += calc_metric(texts[i], pred_texts[i])
             sample_count += 1
     
     if sample_count>=tiger_test.n:
         break
 
-terr_med = terr_med/sample_count
-print('Acuraccy (char level): %f'%(1-terr_med))
+acc_med = acc_med/sample_count
+print('Acuraccy (char level): %f'%(acc_med))
