@@ -391,7 +391,7 @@ net_out = model.get_layer(name='softmax').output
 
 sample_count = 0
 batch_count = 0
-for inp_value, _ in tiger_test.next_batch():
+for inp_value, _ in []: #tiger_test.next_batch():
     bs = inp_value['the_input'].shape[0]
     X_data = inp_value['the_input']
 #     print(X_data)
