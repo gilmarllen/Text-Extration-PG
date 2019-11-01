@@ -121,8 +121,8 @@ def getCropsFromFile(filepath):
         crops = json.load(json_file)
         return crops
 
-def calc_metric(x, y):
-    return 1.00 - textdistance.levenshtein.normalized_distance(x, y)
+def calc_metric(gt, pred):
+    return textdistance.levenshtein.distance(pred, gt)/len(gt)
 
 class TextImageGenerator:
     
@@ -416,15 +416,13 @@ for inp_value, _ in []: #tiger_test.next_batch():
             fig.add_subplot(ax1)
             ax2 = plt.Subplot(fig, outer[1])
             fig.add_subplot(ax2)
-            print('Pred: %s\nTrue: %s' % (pred_texts[i], texts[i]))
-            f_pred.write(pred_texts[i]+"\n")
-            f_corr.write(texts[i]+"\n")
+            #print('Pred: %s\nTrue: %s' % (pred_texts[i], texts[i]))
             img = X_data[i][:, :, 0].T
             ax1.set_title('Input img')
             ax1.imshow(img, cmap='gray')
             ax1.text(-100, 70, 'Pred: '+pred_texts[i], fontsize=12)
             ax1.text(-100, 100, 'True: '+texts[i], fontsize=12)
-            ax1.text(-100, 140, 'Acc.: '+str(calc_metric(texts[i], pred_texts[i])), fontsize=12)
+            ax1.text(-100, 140, 'CER.: '+str(calc_metric(texts[i], pred_texts[i])), fontsize=12)
             ax1.set_xticks([])
             ax1.set_yticks([])
             ax2.set_title('Activations')
@@ -440,11 +438,8 @@ for inp_value, _ in []: #tiger_test.next_batch():
     if sample_count>=tiger_test.n:
         break
     batch_count += 1
-#        if batch_count>=3:
-#            break
-
-f_pred.close()
-f_corr.close()
+#    if batch_count>=1:
+#        break
 
 
 tiger_test = TextImageGenerator(TEST_PATH, 8, 4, True)
@@ -452,7 +447,7 @@ net_inp = model.get_layer(name='the_input').input
 net_out = model.get_layer(name='softmax').output
 
 char_qtd_total = 0
-acc_med = 0.0
+terr_med = 0.0
 sample_count = 0
 for inp_value, _ in tiger_test.next_batch():
     bs = inp_value['the_input'].shape[0]
@@ -463,16 +458,21 @@ for inp_value, _ in tiger_test.next_batch():
     labels = inp_value['the_labels']
     texts = []
     for label in labels:
-        text = ''.join(list(map(lambda x: LETTERS[int(x)], label)))
+        text = labels_to_text(label)
         texts.append(text.strip())
     
     for i in range(bs):
         if sample_count<tiger_test.n:
-            acc_med += calc_metric(texts[i], pred_texts[i])
+            f_pred.write(pred_texts[i]+"\n")
+            f_corr.write(texts[i]+"\n")
+            terr_med += calc_metric(texts[i], pred_texts[i])
             sample_count += 1
     
     if sample_count>=tiger_test.n:
         break
 
-acc_med = acc_med/sample_count
-print('Acuraccy (char level): %f'%(acc_med))
+f_pred.close()
+f_corr.close()
+
+terr_med /= sample_count
+print('Character Error Rate: %f'%(terr_med))
