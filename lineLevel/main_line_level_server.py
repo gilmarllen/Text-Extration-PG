@@ -171,6 +171,31 @@ class TextImageGenerator:
     def resizeImgWithPadding(self, img):
         src_h, src_w = img.shape
 
+        acumm_val = []
+        for i in range(src_h):
+            acumm = 0
+            for j in range(src_w):
+                acumm += (255 - img[i][j])
+            acumm_val.append(acumm)
+
+        acumm_val = np.array(acumm_val)
+
+        ACUMM_LIMIT = 5*src_w
+        lo_bound = 0
+        up_bound = src_h
+        for i in range(acumm_val.shape[0]):
+            if acumm_val[i] > ACUMM_LIMIT:
+                lo_bound = i
+                break
+
+        for i in range(acumm_val.shape[0]):
+            if acumm_val[acumm_val.shape[0]-i-1] > ACUMM_LIMIT:
+                up_bound = acumm_val.shape[0]-i-1
+                break
+
+        img = img[lo_bound:up_bound,:]
+        src_h, src_w = img.shape
+
         text_h = math.ceil(self.img_h/2.0)
         scale_ratio = text_h/src_h
         text_w = min(self.img_w, math.ceil(scale_ratio*src_w))
