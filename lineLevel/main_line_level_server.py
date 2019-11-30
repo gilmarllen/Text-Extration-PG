@@ -466,8 +466,8 @@ for inp_value, _ in tiger_test.next_batch():
     if sample_count>=tiger_test.n:
         break
     batch_count += 1
-   if batch_count>=1:
-       break
+    if batch_count>=1:
+        break
 
 
 tiger_test = TextImageGenerator(TEST_PATH, 8, 4, True)
