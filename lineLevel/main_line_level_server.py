@@ -180,20 +180,23 @@ class TextImageGenerator:
 
         acumm_val = np.array(acumm_val)
 
-        ACUMM_LIMIT = 5*src_w
-        lo_bound = 0
-        up_bound = src_h
+        numerator = 0
+        denominator = 0
         for i in range(acumm_val.shape[0]):
-            if acumm_val[i] > ACUMM_LIMIT:
-                lo_bound = i
-                break
+            numerator += i*acumm_val[i]
+            denominator += acumm_val[i]
+        med_metric = math.ceil(numerator/denominator)
 
+        std_acumm = 0
         for i in range(acumm_val.shape[0]):
-            if acumm_val[acumm_val.shape[0]-i-1] > ACUMM_LIMIT:
-                up_bound = acumm_val.shape[0]-i-1
-                break
+            std_acumm += pow((i - med_metric), 2)*(acumm_val[i])
+        std_metric = pow(std_acumm/denominator, 0.5)
 
+        std_cte = 2.35
+        lo_bound = max(math.ceil(med_metric-(std_metric*std_cte)), 0)
+        up_bound = min(math.ceil(med_metric+(std_metric*std_cte)), src_h)
         img = img[lo_bound:up_bound,:]
+
         src_h, src_w = img.shape
 
         text_h = math.ceil(self.img_h/2.0)
@@ -416,7 +419,7 @@ net_out = model.get_layer(name='softmax').output
 
 sample_count = 0
 batch_count = 0
-for inp_value, _ in []: #tiger_test.next_batch():
+for inp_value, _ in tiger_test.next_batch():
     bs = inp_value['the_input'].shape[0]
     X_data = inp_value['the_input']
 #     print(X_data)
@@ -463,8 +466,8 @@ for inp_value, _ in []: #tiger_test.next_batch():
     if sample_count>=tiger_test.n:
         break
     batch_count += 1
-#    if batch_count>=1:
-#        break
+   if batch_count>=1:
+       break
 
 
 tiger_test = TextImageGenerator(TEST_PATH, 8, 4, True)
